@@ -1,0 +1,8 @@
+[package]
+name = "lib"
+edition = "2024"
+version.workspace = true
+
+[dependencies]
+lz-str.workspace = true
+serde_json.workspace = true

@@ -6,3 +6,5 @@ version.workspace = true
 [dependencies]
 lz-str.workspace = true
 serde_json.workspace = true
+image.workspace = true
+ouroboros = "0.18.5"

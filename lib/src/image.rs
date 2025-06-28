@@ -1,3 +1,5 @@
+use image::{GenericImage, GenericImageView, Pixel, SubImage};
+
 use crate::{encryption_key::EncryptionKey, error::Error};
 use std::io::{BufReader, Read};
 
@@ -30,4 +32,108 @@ where
     output.extend(body);
 
     Ok(output)
+}
+
+#[inline(always)]
+pub fn decrypt_derive_key<R>(data: R) -> Result<Vec<u8>, Error>
+where
+    R: Read,
+{
+    decrypt(None, data)
+}
+
+#[derive(Debug)]
+pub struct Point<T> {
+    pub x: T,
+    pub y: T,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum SpritesheetKind {
+    Character,
+    Face,
+}
+impl SpritesheetKind {
+    pub const fn sprite_count(&self) -> Point<usize> {
+        match self {
+            Self::Character => Point { x: 12, y: 8 },
+            Self::Face => Point { x: 3, y: 4 },
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct ImageData(Vec<u8>);
+
+#[ouroboros::self_referencing]
+struct SpritesheetImage<Image>
+where
+    Image: GenericImage + 'static,
+{
+    image: Image,
+    #[borrows(image)]
+    #[not_covariant]
+    subimages: Vec<SubImage<&'this Image>>,
+}
+
+// #[derive(Debug, PartialEq)]
+pub struct Spritesheet<Image>
+where
+    Image: GenericImage + 'static,
+{
+    pub kind: SpritesheetKind,
+    image: SpritesheetImage<Image>,
+}
+impl<I> Spritesheet<I>
+where
+    I: GenericImage + 'static,
+{
+    pub fn new(kind: SpritesheetKind, image: I) -> Self {
+        let width = image.width() as usize;
+        let height = image.height() as usize;
+
+        let Point { x: col_count, y: row_count } = kind.sprite_count();
+
+        let sprite_width = width / col_count;
+        let sprite_height = height / row_count;
+
+        let sprite_count = col_count * row_count;
+
+        let get_pos_from_index = |index: usize| {
+            let row_size = width / sprite_width;
+
+            let x_index = index % row_size;
+            let y_index = index / row_size;
+
+            Point {
+                x: x_index * sprite_width,
+                y: y_index * sprite_height,
+            }
+        };
+
+        Self {
+            kind,
+            image: SpritesheetImageBuilder {
+                image,
+                subimages_builder: |image| {
+                    (0..sprite_count)
+                        .map(|i| {
+                            let sprite_pos = get_pos_from_index(i);
+                            image.view(
+                                sprite_pos.x as u32,
+                                sprite_pos.y as u32,
+                                sprite_width as u32,
+                                sprite_height as u32,
+                            )
+                        })
+                        .collect()
+                },
+            }
+            .build(),
+        }
+    }
+
+    pub fn get_subimage(&self, index: usize) -> Option<&SubImage<&I>> {
+        self.image.with_subimages(|subimages| subimages.get(index))
+    }
 }

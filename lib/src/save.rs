@@ -13,15 +13,35 @@ pub fn compress(data: &str) -> String {
     lz_str::compress_to_base64(data)
 }
 
-pub fn decompress_json_pretty(data: &str) -> Result<String, Error> {
-    let decompressed = decompress(data)?;
-    let json_str: serde_json::Value = serde_json::from_str(&decompressed)?;
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct Json(serde_json::Value);
+impl Json {
+    pub fn decompress(data: &str) -> Result<Self, Error> {
+        let decompressed = decompress(data)?;
+        serde_json::from_str(&decompressed)
+            .map(Json)
+            .map_err(|e| e.into())
+    }
 
-    serde_json::to_string_pretty(&json_str).map_err(|e| e.into())
-}
+    pub fn from_string(s: &str) -> Result<Self, Error> {
+        serde_json::from_str(s).map(Self).map_err(|e| e.into())
+    }
 
-pub fn compress_json(data: &str) -> Result<String, Error> {
-    let json: serde_json::Value = serde_json::from_str(data)?;
-    let json_str = serde_json::to_string(&json)?;
-    Ok(compress(&json_str))
+    pub fn compress(&self) -> Result<String, Error> {
+        let s = self.to_string();
+        s.map(|x| compress(&x))
+    }
+
+    pub fn inner(self) -> serde_json::Value {
+        self.0
+    }
+
+    pub fn to_string(&self) -> Result<String, Error> {
+        serde_json::to_string(&self.0).map_err(|e| e.into())
+    }
+
+    pub fn to_string_pretty(&self) -> Result<String, Error> {
+        serde_json::to_string_pretty(&self.0).map_err(|e| e.into())
+    }
 }

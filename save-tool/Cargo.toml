@@ -4,5 +4,11 @@ version.workspace = true
 edition = "2024"
 
 [dependencies]
+image.workspace = true
 clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+iced = { version = "0.13.1", features = ["tokio", "advanced", "image-without-codecs"] }
+rfd = "0.15.3"
+chrono = "0.4.41"
 lib = { path = "../lib" }

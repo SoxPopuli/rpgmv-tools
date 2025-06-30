@@ -8,9 +8,12 @@ use iced::{
 use crate::save_entry::SaveEntry;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SaveWidgetMessage {
+pub enum Message {
     HoverEnter,
     HoverExit,
+    Clicked,
+    Copy,
+    Delete,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -36,21 +39,26 @@ impl SaveWidget {
         }
     }
 
-    pub fn update(&mut self, msg: SaveWidgetMessage) {
+    pub fn update(&mut self, msg: Message) {
         match msg {
-            SaveWidgetMessage::HoverEnter => {
+            Message::HoverEnter => {
                 self.is_hovered = true;
             }
-            SaveWidgetMessage::HoverExit => {
+            Message::HoverExit => {
                 self.is_hovered = false;
             }
+            Message::Clicked => {}
+            Message::Copy => {}
+            Message::Delete => {}
         }
     }
 
-    pub fn view(&self) -> iced::Element<SaveWidgetMessage> {
-        let background_color = |theme: &iced::Theme| {
+    pub fn view(&self, is_selected: bool) -> iced::Element<Message> {
+        let background_color = move |theme: &iced::Theme| {
             let palette = theme.extended_palette();
-            let color = if self.is_hovered {
+            let color = if is_selected {
+                palette.primary.weak.color
+            } else if self.is_hovered {
                 palette.background.weak.color
             } else {
                 palette.background.base.color
@@ -104,10 +112,12 @@ impl SaveWidget {
                     ..Default::default()
                 };
 
-                let copy = text("\u{f0c5}").font(font);
+                let copy = text("\u{f0c5}")
+                    .font(font);
                 let delete = text("\u{f2ed}").font(font);
 
-                let buttons = container(row![button(copy), button(delete)].spacing(8)).padding(16);
+                let buttons = container(row![button(copy)
+                    .on_press(Message::Copy), button(delete).on_press(Message::Delete)].spacing(8)).padding(16);
                 content.extend([horizontal_space().into(), buttons.into()])
             } else {
                 content
@@ -127,8 +137,9 @@ impl SaveWidget {
             });
 
         mouse_area(inner)
-            .on_enter(SaveWidgetMessage::HoverEnter)
-            .on_exit(SaveWidgetMessage::HoverExit)
+            .on_enter(Message::HoverEnter)
+            .on_exit(Message::HoverExit)
+            .on_press(Message::Clicked)
             .into()
     }
 }

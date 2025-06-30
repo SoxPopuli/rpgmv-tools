@@ -10,7 +10,6 @@ pub enum SavesState {
     NotLoaded,
     Loaded {
         entries: Vec<SaveWidget>,
-        names: Vec<String>,
     },
     Error(Error),
 }
@@ -43,8 +42,7 @@ impl SavesState {
 
             match values {
                 Ok(v) => {
-                    let names = (0..v.len()).map(|x| format!("File {x}")).collect();
-                    SavesState::Loaded { entries: v, names }
+                    SavesState::Loaded { entries: v }
                 }
                 Err(e) => SavesState::Error(Error::global_error(e.to_string())),
             }

@@ -4,7 +4,7 @@ mod save_entry;
 mod saves_state;
 mod widgets;
 
-use crate::saves_state::SavesState;
+use crate::{saves_state::SavesState, widgets::save_widget};
 use iced::{
     Length, Theme,
     widget::{button, column, row, scrollable, text, text_input, vertical_space},
@@ -15,8 +15,7 @@ use std::path::{Path, PathBuf};
 pub enum Message {
     DirectoryChanged(String),
     OpenDirectoryDialog,
-    SaveSelectionChanged(String),
-    SaveWidgetMessage(usize, widgets::save_widget::SaveWidgetMessage),
+    SaveWidgetMessage(usize, save_widget::Message),
     FontLoaded,
 }
 
@@ -26,6 +25,7 @@ pub type Element<'a> = iced::Element<'a, Message>;
 struct App {
     save_directory: PathBuf,
     saves: SavesState,
+    selected_save_widget: Option<usize>,
 }
 impl App {
     fn update(&mut self, msg: Message) {
@@ -37,6 +37,7 @@ impl App {
                 &self.save_directory,
                 &self.save_directory.join("global.rpgsave"),
             );
+            self.selected_save_widget = None;
         };
 
         match msg {
@@ -52,8 +53,18 @@ impl App {
                     on_new_dir(&new_dir);
                 }
             }
-            SaveSelectionChanged(s) => {}
             SaveWidgetMessage(widget_index, msg) => {
+                match msg {
+                    save_widget::Message::Clicked => {
+                        self.selected_save_widget = Some(widget_index);
+                    }
+                    save_widget::Message::Copy => {
+
+                    }
+                    save_widget::Message::Delete => {}
+                    _ => {}
+                }
+
                 if let SavesState::Loaded { entries, .. } = &mut self.saves
                     && let Some(widget) = entries.get_mut(widget_index)
                 {
@@ -72,13 +83,10 @@ impl App {
                     color: Some(theme.palette().danger),
                 })
                 .into(),
-            SavesState::Loaded {
-                entries: saves,
-                names: _,
-            } => {
+            SavesState::Loaded { entries: saves } => {
                 let views = saves.iter().enumerate().skip(1).map(|(i, widget)| {
                     widget
-                        .view()
+                        .view(self.selected_save_widget == Some(i))
                         .map(move |msg| Message::SaveWidgetMessage(i, msg))
                 });
 

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize)]
 struct SpriteInner(String, usize);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SpriteInfo {
     pub file_name: String,
     pub sprite_index: usize,
@@ -29,7 +29,7 @@ impl Serialize for SpriteInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DateTime(pub chrono::DateTime<chrono::Utc>);
 impl<'de> Deserialize<'de> for DateTime {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -51,7 +51,7 @@ impl Serialize for DateTime {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GlobalEntry {
     pub characters: Vec<SpriteInfo>,

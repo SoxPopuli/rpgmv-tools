@@ -1,5 +1,4 @@
 use crate::{
-    ImageBuffer,
     error::Error,
     global::{GlobalEntry, SpriteInfo},
 };
@@ -13,7 +12,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug)]
+pub type ImageBuffer = image::ImageBuffer<image::Rgba<u8>, Vec<u8>>;
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct SaveEntry {
     pub global: GlobalEntry,
     pub face_images: Vec<ImageBuffer>,

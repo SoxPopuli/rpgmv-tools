@@ -1,71 +1,26 @@
 mod error;
 mod global;
 mod save_entry;
+mod saves_state;
+mod widgets;
 
-use crate::{error::Error, global::GlobalEntry, save_entry::SaveEntry};
+use crate::saves_state::SavesState;
 use iced::{
     Length, Theme,
-    widget::{button, column, row, text, text_input},
+    widget::{button, column, row, scrollable, text, text_input, vertical_space},
 };
-use lib::save::Json as SaveJson;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Message {
     DirectoryChanged(String),
     OpenDirectoryDialog,
+    SaveSelectionChanged(String),
+    SaveWidgetMessage(usize, widgets::save_widget::SaveWidgetMessage),
+    FontLoaded,
 }
 
-pub type ImageBuffer = image::ImageBuffer<image::Rgba<u8>, Vec<u8>>;
 pub type Element<'a> = iced::Element<'a, Message>;
-
-#[derive(Debug, Default)]
-pub enum SavesState {
-    #[default]
-    NotLoaded,
-    Loaded(Vec<Option<SaveEntry>>),
-    Error(Error),
-}
-impl SavesState {
-    pub fn load_from_global(save_dir: &Path, global_path: &Path) -> SavesState {
-        let save_json = {
-            let file = std::fs::read_to_string(global_path);
-            file.ok().and_then(|f| SaveJson::decompress(&f).ok())
-        };
-
-        let mut file_cache = HashMap::default();
-
-        let save_json = match save_json {
-            None => return SavesState::NotLoaded,
-            Some(x) => x,
-        };
-
-        let mut from_values = |values: Vec<serde_json::Value>| -> SavesState {
-            let values = values
-                .into_iter()
-                .map(serde_json::from_value::<Option<GlobalEntry>>)
-                .map(|entry| match entry {
-                    Ok(Some(entry)) => SaveEntry::new(entry, save_dir, &mut file_cache).map(Some),
-                    Ok(None) => Ok(None),
-                    Err(e) => Err(Error::Io(e.to_string())),
-                })
-                .collect::<Result<Vec<_>, _>>();
-
-            match values {
-                Ok(v) => SavesState::Loaded(v),
-                Err(e) => SavesState::Error(Error::global_error(e.to_string())),
-            }
-        };
-
-        match save_json.inner() {
-            serde_json::Value::Array(values) => from_values(values),
-            _ => SavesState::Error(Error::global_error("Invalid global file")),
-        }
-    }
-}
 
 #[derive(Debug, Default)]
 struct App {
@@ -97,6 +52,38 @@ impl App {
                     on_new_dir(&new_dir);
                 }
             }
+            SaveSelectionChanged(s) => {}
+            SaveWidgetMessage(widget_index, msg) => {
+                if let SavesState::Loaded { entries, .. } = &mut self.saves
+                    && let Some(widget) = entries.get_mut(widget_index)
+                {
+                    widget.update(msg);
+                }
+            }
+            FontLoaded => {}
+        }
+    }
+
+    fn view_saves(&self) -> Element {
+        match &self.saves {
+            SavesState::NotLoaded => vertical_space().into(),
+            SavesState::Error(e) => text(e.to_string())
+                .style(|theme: &Theme| text::Style {
+                    color: Some(theme.palette().danger),
+                })
+                .into(),
+            SavesState::Loaded {
+                entries: saves,
+                names: _,
+            } => {
+                let views = saves.iter().enumerate().skip(1).map(|(i, widget)| {
+                    widget
+                        .view()
+                        .map(move |msg| Message::SaveWidgetMessage(i, msg))
+                });
+
+                scrollable(column(views)).into()
+            }
         }
     }
 
@@ -109,33 +96,12 @@ impl App {
         .width(Length::Fill)
         .spacing(8);
 
-        let content: Option<Element> = match &self.saves {
-            SavesState::NotLoaded => None,
-            SavesState::Error(e) => Some(text(e.to_string()).into()),
-            SavesState::Loaded(saves) => {
-                let elems = saves.iter().map(|save| match save {
-                    Some(s) => row![
-                        row(s
-                            .face_image_handles()
-                            .map(|x| iced::widget::image(x).into())),
-                        row(s
-                            .character_image_handles()
-                            .map(|x| iced::widget::image(x).into()))
-                    ]
-                    .into(),
-                    None => text("None").into(),
-                });
-
-                Some(column(elems).into())
-            }
-        };
-
-        let content = content.unwrap_or(iced::widget::vertical_space().into());
+        let content = self.view_saves();
 
         // let content =
         //     iced::widget::scrollable(row![text(format!("{:#?}", self.saves)),]).width(Length::Fill);
 
-        column![folder_box, content]
+        column![folder_box, iced::widget::horizontal_rule(24), content]
             .padding(8)
             .width(Length::Fill)
             .height(Length::Fill)
@@ -146,13 +112,21 @@ impl App {
         Theme::Dark
     }
 
-    fn run(self) -> iced::Result {
+    fn run(self, task: iced::Task<Message>) -> iced::Result {
         iced::application(env!("CARGO_BIN_NAME"), Self::update, Self::view)
             .theme(Self::theme)
-            .run()
+            .run_with(|| (self, task))
     }
 }
 
 fn main() {
-    App::default().run().expect("Failed to run app");
+    let fa_font = include_bytes!("../Font Awesome 6 Free-Solid-900.otf");
+    let task = iced::font::load(fa_font).map(|e| {
+        if let Err(e) = e {
+            panic!("Error loading font: {e:?}")
+        }
+        Message::FontLoaded
+    });
+
+    App::default().run(task).expect("Failed to run app");
 }
